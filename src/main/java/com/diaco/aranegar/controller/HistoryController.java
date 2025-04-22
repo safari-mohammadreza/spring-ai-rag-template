@@ -82,16 +82,9 @@ public class HistoryController {
                     String username = document.getUsername();
                     String sessionId = document.getSessionId();
 
-                    String referenceImagePath = minioService.generateMinIoFilePath(username, sessionId,
-                            document.getReferenceImageName());
-                    String editableImagePath = minioService.generateMinIoFilePath(username, sessionId,
-                            document.getEditableImageName());
-                    String resultImagePath = minioService.generateMinIoFilePath(username, sessionId,
-                            document.getResultImageName());
-
-                    Mono<String> referenceImageUrlMono = minioService.generateFileUrl(referenceImagePath);
-                    Mono<String> editableImageUrlMono = minioService.generateFileUrl(editableImagePath);
-                    Mono<String> resultImageUrlMono = minioService.generateFileUrl(resultImagePath);
+                    Mono<String> referenceImageUrlMono = minioService.generateFileUrl(document.getReferenceImagePath());
+                    Mono<String> editableImageUrlMono = minioService.generateFileUrl(document.getEditableImagePath());
+                    Mono<String> resultImageUrlMono = minioService.generateFileUrl(document.getResultImagePath());
 
                     return Mono.zip(referenceImageUrlMono, editableImageUrlMono, resultImageUrlMono)
                             .map(tuple -> {
