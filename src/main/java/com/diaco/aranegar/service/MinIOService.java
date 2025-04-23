@@ -111,7 +111,7 @@ public class MinIOService {
     }
 
     /**
-     * Generate a pre-signed URL for accessing the audio file from MinIO.
+     * Generate a pre-signed URL for accessing the file from MinIO.
      */
     public Mono<String> generateFileUrl(String filePath) {
         try {
@@ -125,7 +125,7 @@ public class MinIOService {
             );
             return Mono.just(presignedUrl);
         } catch (Exception e) {
-            log.error("Error generating pre-signed URL for audio file: {}", filePath, e);
+            log.error("Error generating pre-signed URL for file: {}", filePath, e);
             return Mono.error(e);
         }
     }

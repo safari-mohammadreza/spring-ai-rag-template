@@ -182,7 +182,8 @@ public class AranegarController {
                                     log.info("Successfully sent URLs to RabbitMQ for sessionId={}", sessionId);
                                     // 4. Save initial document in ES (adjust method signature if you need to store both URLs)
                                     return elasticsearchService
-                                            .saveInitialDocument(username, sessionId, editableImagePath, editableImageName)
+                                            .saveInitialDocument(username, sessionId, editableImageName,
+                                                    editableImagePath, referenceImageName, referenceImagePath)
                                             .thenReturn(ResponseEntity.ok(GenericResponseDto.success(sessionId)));
                                 } else {
                                     log.error("Failed to send URLs to RabbitMQ for sessionId={}", sessionId);
