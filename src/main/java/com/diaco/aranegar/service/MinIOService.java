@@ -131,7 +131,7 @@ public class MinIOService {
     }
 
     public String generateMinIoFilePath(String username, String sessionId, String fileName) {
-        return String.format("%s/%s/%s", username, sessionId, fileName.trim());
+        return String.format("%s/%s/%s", username, sessionId, fileName.replaceAll("\\s", ""));
     }
 
     public Mono<Boolean> deleteFile(String filePath) {
