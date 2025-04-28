@@ -49,7 +49,7 @@ public class AranegarController {
     private final Utils fileUtils;
 
     private final Map<String, Sinks.Many<String>> sinkMap = new HashMap<>();
-    private final int MAX_FILE_SIZE = 100 * 1024; //100KB
+    private final int MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 
     @PostMapping("/process")
