@@ -21,6 +21,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.*;
 import org.springframework.http.codec.multipart.FilePart;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -56,99 +57,126 @@ public class AranegarController {
     public Mono<ResponseEntity<GenericResponseDto<String>>> processFile(
             @RequestPart("referenceImage") Mono<FilePart> referenceImageMono,
             @RequestPart("editableImage") Mono<FilePart> editableImageMono,
+            @RequestPart("editedImage") Mono<FilePart> editedImageMono,
             @RequestHeader(name = "Authorization") String token) {
 
         String username = jwtUtils.getUserNameFromJwtToken(token);
         String sessionId = username.concat(UUID.randomUUID().toString());
 
-        log.info("Received request to upload audio. sessionId: {}, username: {}", sessionId, username);
+        log.info("Received request to upload images. sessionId: {}, username: {}", sessionId, username);
 
         sinkMap.computeIfAbsent(sessionId,
                 id -> Sinks.many().multicast().onBackpressureBuffer());
 
-        return Mono.zip(referenceImageMono, editableImageMono)
+        return Mono.zip(referenceImageMono, editableImageMono, editedImageMono)
                 .flatMap(tuple -> {
                     FilePart referenceImagePart = tuple.getT1();
-                    FilePart editableImagePart = tuple.getT2();
+                    FilePart editableImagePart  = tuple.getT2();
+                    FilePart editedImagePart    = tuple.getT3();
 
-                    // 4a. Validate reference extension
-                    String faceExt = fileUtils.getFileExtension(referenceImagePart.filename());
-                    if (!fileUtils.isValidFileFormat(faceExt)) {
-                        log.error("Invalid face extension {} for session {}", faceExt, sessionId);
-                        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                .body(GenericResponseDto.<String>failure(ResultEnum.INVALID_INPUT,
-                                        "Invalid face file format.")));
-                    }
+                    // 1. Validate referenceImage
+                    Mono<ResponseEntity<GenericResponseDto<String>>> referenceValidation = validatePart(
+                            referenceImagePart,
+                            "face",
+                            ResultEnum.INVALID_INPUT,
+                            sessionId
+                    );
 
-                    // 4b. Validate reference size then MIME
-                    Mono<ResponseEntity<GenericResponseDto<String>>> faceValidation = referenceImagePart.content()
-                            .map(DataBuffer::readableByteCount)
-                            .reduce(0L, Long::sum)
-                            .flatMap(size -> {
-                                if (size > MAX_FILE_SIZE) {
-                                    log.error("Face image too large ({} bytes) for session {}", size, sessionId);
-                                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                            .body(GenericResponseDto.<String>failure(ResultEnum.INVALID_INPUT,
-                                                    "Face image exceeds size limit.")));
-                                }
-                                return fileUtils.detectMimeType(referenceImagePart)
-                                        .flatMap(mime -> {
-                                            if (!mime.startsWith("image/")) {
-                                                log.error("Face MIME {} invalid for session {}", mime, sessionId);
-                                                return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                                        .body(GenericResponseDto.<String>failure(ResultEnum.INVALID_INPUT,
-                                                                "Face must be an image.")));
-                                            }
-                                            return Mono.empty(); // OK
-                                        });
-                            });
+                    // 2. Validate editableImage
+                    Mono<ResponseEntity<GenericResponseDto<String>>> editableValidation = validatePart(
+                            editableImagePart,
+                            "file",
+                            ResultEnum.INVALID_INPUT,
+                            sessionId
+                    );
 
-                    // 5. Validate editable extension, size, and MIME
-                    Mono<ResponseEntity<GenericResponseDto<String>>> fileValidation = editableImagePart.content()
-                            .map(DataBuffer::readableByteCount)
-                            .reduce(0L, Long::sum)
-                            .flatMap(size -> {
-                                if (size > MAX_FILE_SIZE) {
-                                    log.error("File too large ({} bytes) for session {}", size, sessionId);
-                                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                            .body(GenericResponseDto.<String>failure(ResultEnum.INVALID_INPUT,
-                                                    "File exceeds size limit.")));
-                                }
-                                String fileExt = fileUtils.getFileExtension(editableImagePart.filename());
-                                if (!fileUtils.isValidFileFormat(fileExt)) {
-                                    log.error("Invalid file extension {} for session {}", fileExt, sessionId);
-                                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                            .body(GenericResponseDto.<String>failure(ResultEnum.INVALID_INPUT,
-                                                    "Invalid file format.")));
-                                }
-                                return Mono.empty(); // OK
-                            });
+                    // 3. Validate editedImage (same rules)
+                    Mono<ResponseEntity<GenericResponseDto<String>>> editedValidation = validatePart(
+                            editedImagePart,
+                            "edited",
+                            ResultEnum.INVALID_INPUT,
+                            sessionId
+                    );
 
-                    // 6. Run both validations in sequence, then upload
-                    return faceValidation
-                            .flatMap(Mono::just)           // if faceValidation emitted a ResponseEntity, short‑circuit
+                    // 4. Sequence validations, then process upload
+                    return referenceValidation
+                            .flatMap(Mono::just)
                             .switchIfEmpty(
-                                    fileValidation
-                                            .flatMap(Mono::just) // if fileValidation emitted a ResponseEntity
+                                    editableValidation
+                                            .flatMap(Mono::just)
                                             .switchIfEmpty(
-                                                    // both passed: call your upload
-                                                    processFileUpload(referenceImagePart, editableImagePart, sessionId,
-                                                            username)
+                                                    editedValidation
+                                                            .flatMap(Mono::just)
+                                                            .switchIfEmpty(
+                                                                    processFileUpload(
+                                                                            referenceImagePart,
+                                                                            editableImagePart,
+                                                                            editedImagePart,
+                                                                            sessionId,
+                                                                            username)
+                                                            )
                                             )
                             );
                 })
-                // 7. Global error handler
                 .onErrorResume(error -> {
                     log.error("Unexpected error during upload, session {}: {}", sessionId, error.getMessage(), error);
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body(GenericResponseDto.failure(ResultEnum.GENERAL_EXCEPTION,
+                            .body(GenericResponseDto.failure(
+                                    ResultEnum.GENERAL_EXCEPTION,
                                     "Unexpected error occurred.")));
+                });
+    }
+
+    /**
+     * Common validation logic for each FilePart.
+     * @param part      the incoming FilePart
+     * @param label     a label for logging (e.g. "face", "file", "edited")
+     * @param result    the ResultEnum to use on failure
+     * @param sessionId the current session id for logs
+     */
+    private Mono<ResponseEntity<GenericResponseDto<String>>> validatePart(
+            FilePart part,
+            String label,
+            ResultEnum result,
+            String sessionId) {
+        String ext = fileUtils.getFileExtension(part.filename());
+        if (!fileUtils.isValidFileFormat(ext)) {
+            log.error("Invalid {} extension {} for session {}", label, ext, sessionId);
+            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(GenericResponseDto.<String>failure(
+                            result,
+                            StringUtils.capitalize(label) + " file format is not supported.")));
+        }
+
+        return part.content()
+                .map(DataBuffer::readableByteCount)
+                .reduce(0L, Long::sum)
+                .flatMap(size -> {
+                    if (size > MAX_FILE_SIZE) {
+                        log.error("{} image too large ({} bytes) for session {}", label, size, sessionId);
+                        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                .body(GenericResponseDto.<String>failure(
+                                        result,
+                                        StringUtils.capitalize(label) + " file exceeds size limit.")));
+                    }
+                    return fileUtils.detectMimeType(part)
+                            .flatMap(mime -> {
+                                if (!mime.startsWith("image/")) {
+                                    log.error("{} MIME {} invalid for session {}", label, mime, sessionId);
+                                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                            .body(GenericResponseDto.<String>failure(
+                                                    result,
+                                                    StringUtils.capitalize(label) + " must be an image.")));
+                                }
+                                return Mono.empty();
+                            });
                 });
     }
 
     private Mono<ResponseEntity<GenericResponseDto<String>>> processFileUpload(
             FilePart referenceImage,
             FilePart editableImage,
+            FilePart editedImage,
             String sessionId,
             String username) {
 
@@ -159,7 +187,10 @@ public class AranegarController {
         String editableImageName = editableImage.filename();
         String editableImagePath = minioService.generateMinIoFilePath(username, sessionId, editableImageName);
 
-        log.info("Uploading to MinIO: facePath={} filePath={}", referenceImagePath, editableImagePath);
+        String editedImageName = editedImage.filename();
+        String editedImagePath = minioService.generateMinIoFilePath(username, sessionId, editedImageName);
+
+        log.info("Uploading to MinIO...");
 
         // 2. Upload both in parallel, then get their URLs
         Mono<String> referenceUrlMono = minioService.saveFileToMinIO(referenceImagePath, referenceImage)
@@ -168,15 +199,17 @@ public class AranegarController {
         Mono<String> editableUrlMono = minioService.saveFileToMinIO(editableImagePath, editableImage)
                 .then(minioService.generateFileUrl(editableImagePath));
 
-        return Mono.zip(referenceUrlMono, editableUrlMono)
+        Mono<String> editedUrlMono = minioService.saveFileToMinIO(editedImagePath, editedImage)
+                .then(minioService.generateFileUrl(editedImagePath));
+
+        return Mono.zip(referenceUrlMono, editableUrlMono, editedUrlMono)
                 .flatMap(urls -> {
                     String referenceImageUrl = urls.getT1();
                     String editableImageUrl = urls.getT2();
-                    log.info("Generated URLs: referenceImageUrl={} editableImageUrl={}",
-                            referenceImageUrl, editableImageUrl);
+                    String editedImageUrl = urls.getT3();
 
                     // 3. Send both URLs to RabbitMQ
-                    return rabbitMQService.sendToQueue(referenceImageUrl, editableImageUrl, sessionId)
+                    return rabbitMQService.sendToQueue(referenceImageUrl, editableImageUrl, editedImageUrl, sessionId)
                             .flatMap(sent -> {
                                 if (sent) {
                                     log.info("Successfully sent URLs to RabbitMQ for sessionId={}", sessionId);
