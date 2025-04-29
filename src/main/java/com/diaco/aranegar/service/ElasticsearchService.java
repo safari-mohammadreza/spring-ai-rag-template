@@ -18,8 +18,10 @@ public class ElasticsearchService {
     private final AranegarRepository aranegarRepository;
     private final ReactiveElasticsearchOperations elasticsearchOperations;
 
-    public Mono<AranegarDocument> saveInitialDocument(String username, String sessionId, String editableImageName,
-                                                      String editableImagePath, String referenceImageName, String referenceImagePath) {
+    public Mono<AranegarDocument> saveInitialDocument(String username, String sessionId,
+                                                      String editableImageName, String editableImagePath,
+                                                      String referenceImageName, String referenceImagePath,
+                                                      String editedImageName, String editedImagePath) {
         AranegarDocument document = AranegarDocument.builder()
                 .sessionId(sessionId)
                 .username(username)
@@ -27,6 +29,8 @@ public class ElasticsearchService {
                 .referenceImageName(referenceImageName)
                 .editableImageName(editableImageName)
                 .editableImagePath(editableImagePath)
+                .editedImageName(editedImageName)
+                .editedImagePath(editedImagePath)
                 .title("new_file")
                 .isCompleted(false)
                 .createTime(System.currentTimeMillis())

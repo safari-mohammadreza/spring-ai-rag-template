@@ -20,9 +20,11 @@ public class AranegarDocument {
     private String title;
     private String referenceImageName;
     private String editableImageName;
+    private String editedImageName;
     private String resultImageName;
     private String referenceImagePath;
     private String editableImagePath;
+    private String editedImagePath;
     private String resultImagePath;
     private Boolean isCompleted;
     private Long createTime;

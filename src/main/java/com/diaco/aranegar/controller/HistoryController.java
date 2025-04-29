@@ -83,24 +83,24 @@ public class HistoryController {
                     String sessionId = document.getSessionId();
 
                     Mono<String> referenceImageUrlMono = minioService.generateFileUrl(document.getReferenceImagePath());
-                    Mono<String> editableImageUrlMono = minioService.generateFileUrl(document.getEditableImagePath());
+                    Mono<String> editedImageUrlMono = minioService.generateFileUrl(document.getEditedImagePath());
                     Mono<String> resultImageUrlMono = minioService.generateFileUrl(document.getResultImagePath());
 
-                    return Mono.zip(referenceImageUrlMono, editableImageUrlMono, resultImageUrlMono)
+                    return Mono.zip(referenceImageUrlMono, editedImageUrlMono, resultImageUrlMono)
                             .map(tuple -> {
                                 String referenceFileUrl = tuple.getT1();
-                                String editableFileUrl = tuple.getT2();
+                                String editedFileUrl = tuple.getT2();
                                 String resultFileUrl = tuple.getT3();
 
                                 AranegarDto dto = AranegarDto.builder()
                                         .id(sessionId)
                                         .username(username)
                                         .referenceImageName(document.getReferenceImageName())
-                                        .editableImageName(document.getEditableImageName())
+                                        .editedImageName(document.getEditedImageName())
                                         .resultImageName(document.getResultImageName())
                                         .createTime(utils.longToZonedDateTime(document.getCreateTime()))
                                         .referenceImageUrl(referenceFileUrl)
-                                        .editableImageUrl(editableFileUrl)
+                                        .editedImageUrl(editedFileUrl)
                                         .resultImageUrl(resultFileUrl)
                                         .isCompleted(document.getIsCompleted())
                                         .build();
