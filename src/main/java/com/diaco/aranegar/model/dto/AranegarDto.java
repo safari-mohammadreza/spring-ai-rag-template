@@ -14,9 +14,11 @@ public class AranegarDto {
     private String username;
     private String referenceImageName;
     private String editedImageName;
+    private String editableImageName;
     private String resultImageName;
     private String referenceImageUrl;
     private String editedImageUrl;
+    private String editableImageUrl;
     private String resultImageUrl;
     @JsonFormat(timezone = "UTC", pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     private ZonedDateTime createTime;
