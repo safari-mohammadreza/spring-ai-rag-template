@@ -83,13 +83,13 @@ public class HistoryController {
                     String sessionId = document.getSessionId();
 
                     Mono<String> referenceImageUrlMono = minioService.generateFileUrl(document.getReferenceImagePath());
-                    Mono<String> maskImageUrlMono = minioService.generateFileUrl(document.getMaskImagePath());
+                    Mono<String> editedImageUrlMono = minioService.generateFileUrl(document.getEditedImagePath());
                     Mono<String> resultImageUrlMono = minioService.generateFileUrl(document.getResultImagePath());
 
-                    return Mono.zip(referenceImageUrlMono, maskImageUrlMono, resultImageUrlMono)
+                    return Mono.zip(referenceImageUrlMono, editedImageUrlMono, resultImageUrlMono)
                             .map(tuple -> {
                                 String referenceFileUrl = tuple.getT1();
-                                String maskFileUrl = tuple.getT2();
+                                String editedFileUrl = tuple.getT2();
                                 String resultFileUrl = tuple.getT3();
 
                                 AranegarDto dto = AranegarDto.builder()
@@ -97,10 +97,10 @@ public class HistoryController {
                                         .username(username)
                                         .referenceImageName(document.getReferenceImageName())
                                         .resultImageName(document.getResultImageName())
-                                        .maskImageName(document.getMaskImageName())
+                                        .editedImageName(document.getEditedImageName())
                                         .referenceImageUrl(referenceFileUrl)
                                         .resultImageUrl(resultFileUrl)
-                                        .maskImageUrl(maskFileUrl)
+                                        .editedImageUrl(editedFileUrl)
                                         .isCompleted(document.getIsCompleted())
                                         .createTime(utils.longToZonedDateTime(document.getCreateTime()))
                                         .build();
