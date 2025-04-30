@@ -22,10 +22,12 @@ public class AranegarDocument {
     private String editableImageName;
     private String editedImageName;
     private String resultImageName;
+    private String maskImageName;
     private String referenceImagePath;
     private String editableImagePath;
     private String editedImagePath;
     private String resultImagePath;
+    private String maskImagePath;
     private Boolean isCompleted;
     private Long createTime;
     private Long updateTime;

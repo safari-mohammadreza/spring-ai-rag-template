@@ -21,16 +21,19 @@ public class ElasticsearchService {
     public Mono<AranegarDocument> saveInitialDocument(String username, String sessionId,
                                                       String editableImageName, String editableImagePath,
                                                       String referenceImageName, String referenceImagePath,
-                                                      String editedImageName, String editedImagePath) {
+                                                      String editedImageName, String editedImagePath,
+                                                      String maskImageName, String maskImagePath) {
         AranegarDocument document = AranegarDocument.builder()
                 .sessionId(sessionId)
                 .username(username)
-                .referenceImagePath(referenceImagePath)
                 .referenceImageName(referenceImageName)
                 .editableImageName(editableImageName)
-                .editableImagePath(editableImagePath)
                 .editedImageName(editedImageName)
+                .maskImageName(maskImageName)
+                .referenceImagePath(referenceImagePath)
+                .editableImagePath(editableImagePath)
                 .editedImagePath(editedImagePath)
+                .maskImagePath(maskImagePath)
                 .title("new_file")
                 .isCompleted(false)
                 .createTime(System.currentTimeMillis())

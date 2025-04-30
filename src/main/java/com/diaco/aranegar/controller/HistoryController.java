@@ -83,30 +83,26 @@ public class HistoryController {
                     String sessionId = document.getSessionId();
 
                     Mono<String> referenceImageUrlMono = minioService.generateFileUrl(document.getReferenceImagePath());
-                    Mono<String> editedImageUrlMono = minioService.generateFileUrl(document.getEditedImagePath());
+                    Mono<String> maskImageUrlMono = minioService.generateFileUrl(document.getMaskImagePath());
                     Mono<String> resultImageUrlMono = minioService.generateFileUrl(document.getResultImagePath());
-                    Mono<String> editableImageUrlMono = minioService.generateFileUrl(document.getEditableImagePath());
 
-                    return Mono.zip(referenceImageUrlMono, editedImageUrlMono, resultImageUrlMono, editableImageUrlMono)
+                    return Mono.zip(referenceImageUrlMono, maskImageUrlMono, resultImageUrlMono)
                             .map(tuple -> {
                                 String referenceFileUrl = tuple.getT1();
-                                String editedFileUrl = tuple.getT2();
+                                String maskFileUrl = tuple.getT2();
                                 String resultFileUrl = tuple.getT3();
-                                String editableFileUrl = tuple.getT4();
 
                                 AranegarDto dto = AranegarDto.builder()
                                         .id(sessionId)
                                         .username(username)
                                         .referenceImageName(document.getReferenceImageName())
-                                        .editedImageName(document.getEditedImageName())
                                         .resultImageName(document.getResultImageName())
-                                        .editableImageName(document.getEditableImageName())
-                                        .createTime(utils.longToZonedDateTime(document.getCreateTime()))
+                                        .maskImageName(document.getMaskImageName())
                                         .referenceImageUrl(referenceFileUrl)
-                                        .editedImageUrl(editedFileUrl)
-                                        .editableImageUrl(editableFileUrl)
                                         .resultImageUrl(resultFileUrl)
+                                        .maskImageUrl(maskFileUrl)
                                         .isCompleted(document.getIsCompleted())
+                                        .createTime(utils.longToZonedDateTime(document.getCreateTime()))
                                         .build();
 
                                 return ResponseEntity.ok(GenericResponseDto.success(dto));

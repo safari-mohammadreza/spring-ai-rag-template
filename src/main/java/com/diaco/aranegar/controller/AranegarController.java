@@ -56,6 +56,7 @@ public class AranegarController {
     @PostMapping("/process")
     public Mono<ResponseEntity<GenericResponseDto<String>>> processFile(
             @RequestPart("referenceImage") Mono<FilePart> referenceImageMono,
+            @RequestPart("maskImage") Mono<FilePart> maskImageMono,
             @RequestPart("editableImage") Mono<FilePart> editableImageMono,
             @RequestPart("editedImage") Mono<FilePart> editedImageMono,
             @RequestHeader(name = "Authorization") String token) {
@@ -68,16 +69,17 @@ public class AranegarController {
         sinkMap.computeIfAbsent(sessionId,
                 id -> Sinks.many().multicast().onBackpressureBuffer());
 
-        return Mono.zip(referenceImageMono, editableImageMono, editedImageMono)
+        return Mono.zip(referenceImageMono, editableImageMono, editedImageMono, maskImageMono)
                 .flatMap(tuple -> {
                     FilePart referenceImagePart = tuple.getT1();
-                    FilePart editableImagePart  = tuple.getT2();
-                    FilePart editedImagePart    = tuple.getT3();
+                    FilePart editableImagePart = tuple.getT2();
+                    FilePart editedImagePart = tuple.getT3();
+                    FilePart maskImagePart = tuple.getT4();
 
                     // 1. Validate referenceImage
                     Mono<ResponseEntity<GenericResponseDto<String>>> referenceValidation = validatePart(
                             referenceImagePart,
-                            "face",
+                            "ref",
                             ResultEnum.INVALID_INPUT,
                             sessionId
                     );
@@ -85,7 +87,7 @@ public class AranegarController {
                     // 2. Validate editableImage
                     Mono<ResponseEntity<GenericResponseDto<String>>> editableValidation = validatePart(
                             editableImagePart,
-                            "file",
+                            "editable",
                             ResultEnum.INVALID_INPUT,
                             sessionId
                     );
@@ -94,6 +96,14 @@ public class AranegarController {
                     Mono<ResponseEntity<GenericResponseDto<String>>> editedValidation = validatePart(
                             editedImagePart,
                             "edited",
+                            ResultEnum.INVALID_INPUT,
+                            sessionId
+                    );
+
+                    // 3. Validate maskImage (same rules)
+                    Mono<ResponseEntity<GenericResponseDto<String>>> maskValidation = validatePart(
+                            maskImagePart,
+                            "mask",
                             ResultEnum.INVALID_INPUT,
                             sessionId
                     );
@@ -108,12 +118,17 @@ public class AranegarController {
                                                     editedValidation
                                                             .flatMap(Mono::just)
                                                             .switchIfEmpty(
-                                                                    processFileUpload(
-                                                                            referenceImagePart,
-                                                                            editableImagePart,
-                                                                            editedImagePart,
-                                                                            sessionId,
-                                                                            username)
+                                                                    maskValidation
+                                                                            .flatMap(Mono::just)
+                                                                            .switchIfEmpty(
+                                                                                    processFileUpload(
+                                                                                            referenceImagePart,
+                                                                                            editableImagePart,
+                                                                                            editedImagePart,
+                                                                                            maskImagePart,
+                                                                                            sessionId,
+                                                                                            username)
+                                                                            )
                                                             )
                                             )
                             );
@@ -129,6 +144,7 @@ public class AranegarController {
 
     /**
      * Common validation logic for each FilePart.
+     *
      * @param part      the incoming FilePart
      * @param label     a label for logging (e.g. "face", "file", "edited")
      * @param result    the ResultEnum to use on failure
@@ -177,6 +193,7 @@ public class AranegarController {
             FilePart referenceImage,
             FilePart editableImage,
             FilePart editedImage,
+            FilePart maskImage,
             String sessionId,
             String username) {
 
@@ -190,6 +207,9 @@ public class AranegarController {
         String editedImageName = editedImage.filename().concat("_edited");
         String editedImagePath = minioService.generateMinIoFilePath(username, sessionId, editedImageName);
 
+        String maskImageName = maskImage.filename().concat("_mask");
+        String maskImagePath = minioService.generateMinIoFilePath(username, sessionId, maskImageName);
+
         log.info("Uploading to MinIO...");
 
         // 2. Upload both in parallel, then get their URLs
@@ -202,11 +222,15 @@ public class AranegarController {
         Mono<String> editedUrlMono = minioService.saveFileToMinIO(editedImagePath, editedImage)
                 .then(minioService.generateFileUrl(editedImagePath));
 
-        return Mono.zip(referenceUrlMono, editableUrlMono, editedUrlMono)
+        Mono<String> maskUrlMono = minioService.saveFileToMinIO(maskImagePath, maskImage)
+                .then(minioService.generateFileUrl(maskImagePath));
+
+        return Mono.zip(referenceUrlMono, editableUrlMono, editedUrlMono, maskUrlMono)
                 .flatMap(urls -> {
                     String referenceImageUrl = urls.getT1();
                     String editableImageUrl = urls.getT2();
                     String editedImageUrl = urls.getT3();
+                    String maskImageUrl = urls.getT4();
 
                     // 3. Send both URLs to RabbitMQ
                     return rabbitMQService.sendToQueue(referenceImageUrl, editableImageUrl, editedImageUrl, sessionId)
@@ -217,7 +241,7 @@ public class AranegarController {
                                     return elasticsearchService
                                             .saveInitialDocument(username, sessionId, editableImageName,
                                                     editableImagePath, referenceImageName, referenceImagePath,
-                                                    editedImageName, editedImagePath)
+                                                    editedImageName, editedImagePath, maskImageName, maskImagePath)
                                             .thenReturn(ResponseEntity.ok(GenericResponseDto.success(sessionId)));
                                 } else {
                                     log.error("Failed to send URLs to RabbitMQ for sessionId={}", sessionId);
