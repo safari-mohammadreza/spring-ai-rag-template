@@ -45,6 +45,12 @@ public class ElasticsearchService {
 
     public Mono<Void> updateCompletedDocument(String sessionId, String resultImagePath) {
 
+        // Preprocess the resultImagePath to remove leading '/'
+        if (resultImagePath != null && resultImagePath.startsWith("/")) {
+            resultImagePath = resultImagePath.substring(1); // Remove the leading '/'
+        }
+
+        String finalResultImagePath = resultImagePath;
         return elasticsearchOperations
                 .indexOps(AranegarDocument.class)
                 .refresh()
@@ -56,7 +62,7 @@ public class ElasticsearchService {
                                 }))
                                 .flatMap(doc -> {
                                     doc.setIsCompleted(true);
-                                    doc.setResultImagePath(resultImagePath);
+                                    doc.setResultImagePath(finalResultImagePath);
                                     doc.setUpdateTime(Instant.now().toEpochMilli());
                                     return aranegarRepository.save(doc)
                                             .doOnSuccess(d -> log.info("Completed doc for {}", sessionId));

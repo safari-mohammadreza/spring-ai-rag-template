@@ -181,13 +181,13 @@ public class AranegarController {
             String username) {
 
         // 1. Generate MinIO paths
-        String referenceImageName = referenceImage.filename();
+        String referenceImageName = referenceImage.filename().concat("_ref");
         String referenceImagePath = minioService.generateMinIoFilePath(username, sessionId, referenceImageName);
 
-        String editableImageName = editableImage.filename();
+        String editableImageName = editableImage.filename().concat("_editable");
         String editableImagePath = minioService.generateMinIoFilePath(username, sessionId, editableImageName);
 
-        String editedImageName = editedImage.filename();
+        String editedImageName = editedImage.filename().concat("_edited");
         String editedImagePath = minioService.generateMinIoFilePath(username, sessionId, editedImageName);
 
         log.info("Uploading to MinIO...");
