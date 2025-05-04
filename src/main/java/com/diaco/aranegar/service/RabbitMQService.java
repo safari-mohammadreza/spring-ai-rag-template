@@ -21,13 +21,13 @@ public class RabbitMQService {
     @Value("${rabbit.queue.request}")
     private String queueName;
 
-    public Mono<Boolean> sendToQueue(String referenceImageUrl, String editableImageUrl, String editedImageUrl,
+    public Mono<Boolean> sendToQueue(String referenceImageUrl, String editableImageUrl, String maskImageUrl,
                                      String sessionId) {
         // Prepare a simple message payload as a Map.
         Map<String, String> message = new HashMap<>();
         message.put("reference_file_url", referenceImageUrl);
         message.put("editable_file_url", editableImageUrl);
-        message.put("edited_file_url", editedImageUrl);
+        message.put("mask_file_url", maskImageUrl);
         message.put("session_id", sessionId);
 
         // Wrap the RabbitMQ sending in a Mono so we can stay in the reactive world.

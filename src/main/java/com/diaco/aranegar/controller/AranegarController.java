@@ -219,21 +219,17 @@ public class AranegarController {
         Mono<String> editableUrlMono = minioService.saveFileToMinIO(editableImagePath, editableImage)
                 .then(minioService.generateFileUrl(editableImagePath));
 
-        Mono<String> editedUrlMono = minioService.saveFileToMinIO(editedImagePath, editedImage)
-                .then(minioService.generateFileUrl(editedImagePath));
-
         Mono<String> maskUrlMono = minioService.saveFileToMinIO(maskImagePath, maskImage)
                 .then(minioService.generateFileUrl(maskImagePath));
 
-        return Mono.zip(referenceUrlMono, editableUrlMono, editedUrlMono, maskUrlMono)
+        return Mono.zip(referenceUrlMono, editableUrlMono, maskUrlMono)
                 .flatMap(urls -> {
                     String referenceImageUrl = urls.getT1();
                     String editableImageUrl = urls.getT2();
-                    String editedImageUrl = urls.getT3();
-                    String maskImageUrl = urls.getT4();
+                    String maskImageUrl = urls.getT3();
 
                     // 3. Send both URLs to RabbitMQ
-                    return rabbitMQService.sendToQueue(referenceImageUrl, editableImageUrl, editedImageUrl, sessionId)
+                    return rabbitMQService.sendToQueue(referenceImageUrl, editableImageUrl, maskImageUrl, sessionId)
                             .flatMap(sent -> {
                                 if (sent) {
                                     log.info("Successfully sent URLs to RabbitMQ for sessionId={}", sessionId);
