@@ -116,7 +116,7 @@ public class HistoryController {
                                     "Document not found")));
                 })
                 .onErrorResume(error -> {
-                    log.error("Error fetching document or generating audio URL", error);
+                    log.error("Error fetching document or generating file URL", error);
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                             .body(GenericResponseDto.failure(ResultEnum.GENERAL_EXCEPTION,
                                     "Failed to fetch document")));
@@ -203,14 +203,14 @@ public class HistoryController {
 
     //rename
     @PutMapping("/{sessionId}")
-    public Mono<ResponseEntity<GenericResponseDto<Boolean>>> updateAudioFileName(
+    public Mono<ResponseEntity<GenericResponseDto<Boolean>>> updateFileName(
             @PathVariable String sessionId,
             @RequestBody UpdateHistoryRequestDto request,
             @RequestHeader(name = "Authorization") String token
     ) {
 
         String username = jwtUtils.getUserNameFromJwtToken(token);
-        log.info("Received request to update audio file name. sessionId: {}, username: {}, newTitle: {}",
+        log.info("Received request to update file name. sessionId: {}, username: {}, newTitle: {}",
                 sessionId, username, request.getNewTitle());
 
         if (containsControlCharacters(request.getNewTitle())) {

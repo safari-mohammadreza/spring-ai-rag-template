@@ -61,32 +61,8 @@ public class MinIOService {
 
                     return uploadFile(fileName, bytes, contentType);
                 })
-                .doOnSuccess(v -> log.info("Audio file uploaded to MinIO: {}", fileName))
+                .doOnSuccess(v -> log.info("File uploaded to MinIO: {}", fileName))
                 .doOnError(error -> log.error("Failed to upload file to MinIO: {}", fileName, error));
-    }
-
-    /**
-     * Save audio file to MinIO.
-     */
-    public Mono<Void> saveFileToMinIO(String filePath, byte[] audioBytes) {
-
-        ByteArrayInputStream inputStream = new ByteArrayInputStream(audioBytes);
-
-        try {
-            minioClient.putObject(
-                    PutObjectArgs.builder()
-                            .bucket(bucketName)
-                            .object(filePath)
-                            .stream(inputStream, audioBytes.length, -1)
-                            .contentType("audio/wav")
-                            .build()
-            );
-            log.info("Audio file {} saved to MinIO.", filePath);
-        } catch (Exception e) {
-            log.error("Error saving audio file to MinIO", e);
-            return Mono.error(e);
-        }
-        return Mono.empty();
     }
 
     public Mono<Void> uploadFile(String fileName, byte[] fileData, String contentType) {

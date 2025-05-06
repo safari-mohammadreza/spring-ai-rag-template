@@ -6,7 +6,6 @@ import com.diaco.aranegar.model.dto.FromAIResultDto;
 import com.diaco.aranegar.model.dto.GeneralMessageDto;
 import com.diaco.aranegar.model.dto.GenericResponseDto;
 import com.diaco.aranegar.model.enums.ResultEnum;
-import com.diaco.aranegar.service.AudioService;
 import com.diaco.aranegar.service.ElasticsearchService;
 import com.diaco.aranegar.service.MinIOService;
 import com.diaco.aranegar.service.RabbitMQService;
@@ -16,10 +15,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -27,9 +26,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -46,7 +42,6 @@ public class AranegarController {
     private final ObjectMapper objectMapper;
     private final JwtUtils jwtUtils;
     private final MinIOService minioService;
-    private final AudioService audioService;
     private final Utils fileUtils;
 
     private final Map<String, Sinks.Many<String>> sinkMap = new HashMap<>();
@@ -198,16 +193,16 @@ public class AranegarController {
             String username) {
 
         // 1. Generate MinIO paths
-        String referenceImageName = referenceImage.filename().concat("_ref");
+        String referenceImageName = "ref_".concat(referenceImage.filename());
         String referenceImagePath = minioService.generateMinIoFilePath(username, sessionId, referenceImageName);
 
-        String editableImageName = editableImage.filename().concat("_editable");
+        String editableImageName = "editable_".concat(editableImage.filename());
         String editableImagePath = minioService.generateMinIoFilePath(username, sessionId, editableImageName);
 
-        String editedImageName = editedImage.filename().concat("_edited");
+        String editedImageName = "edited_".concat(editedImage.filename());
         String editedImagePath = minioService.generateMinIoFilePath(username, sessionId, editedImageName);
 
-        String maskImageName = maskImage.filename().concat("_mask");
+        String maskImageName = "mask_".concat(maskImage.filename());
         String maskImagePath = minioService.generateMinIoFilePath(username, sessionId, maskImageName);
 
         log.info("Uploading to MinIO...");
@@ -219,14 +214,18 @@ public class AranegarController {
         Mono<String> editableUrlMono = minioService.saveFileToMinIO(editableImagePath, editableImage)
                 .then(minioService.generateFileUrl(editableImagePath));
 
+        Mono<String> editedUrlMono = minioService.saveFileToMinIO(editedImagePath, editedImage)
+                .then(minioService.generateFileUrl(editedImagePath));
+
         Mono<String> maskUrlMono = minioService.saveFileToMinIO(maskImagePath, maskImage)
                 .then(minioService.generateFileUrl(maskImagePath));
 
-        return Mono.zip(referenceUrlMono, editableUrlMono, maskUrlMono)
+        return Mono.zip(referenceUrlMono, editableUrlMono, maskUrlMono, editedUrlMono)
                 .flatMap(urls -> {
                     String referenceImageUrl = urls.getT1();
                     String editableImageUrl = urls.getT2();
                     String maskImageUrl = urls.getT3();
+                    String editedImageUrl = urls.getT4();
 
                     // 3. Send both URLs to RabbitMQ
                     return rabbitMQService.sendToQueue(referenceImageUrl, editableImageUrl, maskImageUrl, sessionId)
@@ -325,55 +324,5 @@ public class AranegarController {
                 .doOnCancel(() -> log.info("SSE subscription canceled for sessionId: {}", sessionId))
                 .takeUntil("COMPLETION_SIGNAL"::equals)
                 .doOnTerminate(() -> log.info("SSE subscription completed for sessionId: {}", sessionId));
-    }
-
-    @PostMapping(value = "/trim", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
-            produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    public Mono<ResponseEntity<Resource>> trimAudio(
-            @RequestPart("file") FilePart filePart,
-            @RequestParam("start") double start,
-            @RequestParam("end") double end) {
-
-        // Ensure the temporary directory exists
-        String tempDirPath = "/tmp/audio_processing/";
-        File tempDir = new File(tempDirPath);
-        if (!tempDir.exists()) {
-            boolean created = tempDir.mkdirs();
-            if (!created) {
-                log.error("Failed to create temporary directory: {}", tempDirPath);
-                return Mono.error(new RuntimeException("Failed to create temporary directory for audio processing"));
-            }
-            log.info("Temporary directory created at: {}", tempDirPath);
-        }
-
-        // Generate a unique temporary file path
-        String tempInputFilePath = tempDirPath + UUID.randomUUID() + "_" + filePart.filename();
-
-        return audioService.saveFile(filePart, tempInputFilePath)
-                .doOnSuccess(unused -> log.info("File successfully uploaded to: {}", tempInputFilePath))
-                .then(Mono.fromCallable(() -> {
-                    try (ByteArrayOutputStream outputStream = audioService.trimAudioFile(
-                            new File(tempInputFilePath), start, end)) {
-                        log.info("Audio trimming completed successfully.");
-
-                        org.springframework.core.io.Resource resource = new InputStreamResource(
-                                new ByteArrayInputStream(outputStream.toByteArray()));
-                        HttpHeaders headers = new HttpHeaders();
-                        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-                        headers.setContentDisposition(ContentDisposition.builder("attachment")
-                                .filename("trimmed_" + filePart.filename())
-                                .build());
-                        headers.setContentLength(outputStream.size());
-
-                        return ResponseEntity.ok()
-                                .headers(headers)
-                                .body(resource);
-                    } finally {
-                        // Cleanup temporary input file
-                        new File(tempInputFilePath).delete();
-                        log.info("Temporary input file cleaned up.");
-                    }
-                }))
-                .doOnError(e -> log.error("Error during audio processing: {}", e.getMessage(), e));
     }
 }
