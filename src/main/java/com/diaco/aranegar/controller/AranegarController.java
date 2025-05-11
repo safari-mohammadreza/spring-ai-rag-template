@@ -45,7 +45,7 @@ public class AranegarController {
     private final Utils fileUtils;
 
     private final Map<String, Sinks.Many<String>> sinkMap = new HashMap<>();
-    private final int MAX_FILE_SIZE = 5 * 1024 * 1024;
+    private final int MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 
     @PostMapping("/process")
@@ -140,42 +140,42 @@ public class AranegarController {
     /**
      * Common validation logic for each FilePart.
      *
-     * @param part      the incoming FilePart
+     * @param filePart      the incoming FilePart
      * @param label     a label for logging (e.g. "face", "file", "edited")
      * @param result    the ResultEnum to use on failure
      * @param sessionId the current session id for logs
      */
     private Mono<ResponseEntity<GenericResponseDto<String>>> validatePart(
-            FilePart part,
+            FilePart filePart,
             String label,
             ResultEnum result,
             String sessionId) {
-        String ext = fileUtils.getFileExtension(part.filename());
+        String ext = fileUtils.getFileExtension(filePart.filename());
         if (!fileUtils.isValidFileFormat(ext)) {
             log.error("Invalid {} extension {} for session {}", label, ext, sessionId);
             return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(GenericResponseDto.<String>failure(
+                    .body(GenericResponseDto.failure(
                             result,
                             StringUtils.capitalize(label) + " file format is not supported.")));
         }
 
-        return part.content()
+        return filePart.content()
                 .map(DataBuffer::readableByteCount)
                 .reduce(0L, Long::sum)
                 .flatMap(size -> {
                     if (size > MAX_FILE_SIZE) {
                         log.error("{} image too large ({} bytes) for session {}", label, size, sessionId);
                         return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                .body(GenericResponseDto.<String>failure(
+                                .body(GenericResponseDto.failure(
                                         result,
                                         StringUtils.capitalize(label) + " file exceeds size limit.")));
                     }
-                    return fileUtils.detectMimeType(part)
+                    return fileUtils.detectMimeType(filePart)
                             .flatMap(mime -> {
-                                if (!mime.startsWith("image/")) {
+                                if (!fileUtils.isValidMimeType(mime)) {
                                     log.error("{} MIME {} invalid for session {}", label, mime, sessionId);
                                     return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                            .body(GenericResponseDto.<String>failure(
+                                            .body(GenericResponseDto.failure(
                                                     result,
                                                     StringUtils.capitalize(label) + " must be an image.")));
                                 }

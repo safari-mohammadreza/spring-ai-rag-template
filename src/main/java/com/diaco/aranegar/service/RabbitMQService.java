@@ -23,7 +23,6 @@ public class RabbitMQService {
 
     public Mono<Boolean> sendToQueue(String referenceImageUrl, String editableImageUrl, String maskImageUrl,
                                      String sessionId) {
-        // Prepare a simple message payload as a Map.
         Map<String, String> message = new HashMap<>();
         message.put("reference_file_url", referenceImageUrl);
         message.put("editable_file_url", editableImageUrl);

@@ -11,5 +11,7 @@ public interface AranegarRepository extends ReactiveElasticsearchRepository<Aran
 
     Flux<AranegarDocument> findByUsername(String username);
     Flux<AranegarDocument> findByUsernameOrderByCreateTimeDesc(String username);
+    Flux<AranegarDocument> findByUsernameOrderByCreateTimeAsc(String username);
     Mono<AranegarDocument> findBySessionId(String sessionId);
+    Mono<Long> countByUsername(String username);
 }

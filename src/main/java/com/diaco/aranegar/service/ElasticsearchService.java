@@ -18,11 +18,16 @@ public class ElasticsearchService {
     private final AranegarRepository aranegarRepository;
     private final ReactiveElasticsearchOperations elasticsearchOperations;
 
-    public Mono<AranegarDocument> saveInitialDocument(String username, String sessionId,
-                                                      String editableImageName, String editableImagePath,
-                                                      String referenceImageName, String referenceImagePath,
-                                                      String editedImageName, String editedImagePath,
-                                                      String maskImageName, String maskImagePath) {
+    private final int HISTORY_LIMITATION = 20;
+
+    public Mono<AranegarDocument> saveInitialDocument(
+            String username,
+            String sessionId,
+            String editableImageName, String editableImagePath,
+            String referenceImageName, String referenceImagePath,
+            String editedImageName, String editedImagePath,
+            String maskImageName, String maskImagePath) {
+
         AranegarDocument document = AranegarDocument.builder()
                 .sessionId(sessionId)
                 .username(username)
@@ -39,11 +44,30 @@ public class ElasticsearchService {
                 .createTime(System.currentTimeMillis())
                 .build();
 
-        log.info("Saving document to Elasticsearch: {}", document);
+        log.info("Saving document to Elasticsearch (with 20-doc limit) for user={}", username);
 
-        return aranegarRepository.save(document)
-                .doOnSuccess(savedDoc -> log.info("Document successfully saved: {}", savedDoc))
-                .doOnError(error -> log.error("Error saving document to Elasticsearch", error));
+        Mono<Void> evictionMono = aranegarRepository.countByUsername(username)
+                .flatMap(count -> {
+                    if (count >= HISTORY_LIMITATION) {
+                        log.info("User {} has {} docs, removing oldest before insert", username, count);
+                        return aranegarRepository
+                                .findByUsernameOrderByCreateTimeAsc(username)
+                                .next()
+                                .flatMap(oldest -> {
+                                    log.info("Deleting oldest doc id={} createTime={}", oldest.getSessionId(),
+                                            oldest.getCreateTime());
+                                    return aranegarRepository.deleteById(oldest.getSessionId());
+                                });
+                    } else {
+                        return Mono.empty();
+                    }
+                })
+                .then();
+
+        return evictionMono
+                .then(aranegarRepository.save(document))
+                .doOnSuccess(saved -> log.info("Document successfully saved (post-eviction): {}", saved.getSessionId()))
+                .doOnError(err   -> log.error("Error in saveInitialDocument", err));
     }
 
     public Mono<Void> updateCompletedDocument(String sessionId, String resultImagePath) {
