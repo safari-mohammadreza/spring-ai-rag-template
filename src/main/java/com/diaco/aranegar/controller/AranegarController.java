@@ -276,6 +276,9 @@ public class AranegarController {
                 FromAIResultDto fromAIResultDto = objectMapper.convertValue(request.getData(), FromAIResultDto.class);
                 receiveResult(fromAIResultDto);
             }
+            case ERROR -> {
+                log.error("Error message received: {}", request);
+            }
             default -> log.error("Invalid data type: {} in message: {}", request.getDataType(), message);
         }
     }
@@ -309,13 +312,13 @@ public class AranegarController {
 
     @GetMapping(value = "/listen/{sessionId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> streamProgress(@PathVariable String sessionId) {
-        log.info("Client requested transcription stream for sessionId: {}", sessionId);
+        log.info("Client requested result stream for sessionId: {}", sessionId);
 
         Sinks.Many<String> sink = sinkMap.get(sessionId);
 
         if (sink == null) {
-            log.error("No transcription segments found for sessionId: {}", sessionId);
-            return Flux.error(new FileNotFoundException("No transcription segments found for sessionId: "
+            log.error("No segments found for sessionId: {}", sessionId);
+            return Flux.error(new FileNotFoundException("No segments found for sessionId: "
                     + sessionId));
         }
 

@@ -29,7 +29,7 @@ import java.util.List;
 @CrossOrigin
 public class HistoryController {
 
-    private final AranegarRepository transcriptionRepository;
+    private final AranegarRepository aranegarRepository;
     private final ReactiveElasticsearchOperations elasticsearchOperations;
     private final JwtUtils jwtUtils;
     private final MinIOService minioService;
@@ -42,7 +42,7 @@ public class HistoryController {
         String username = jwtUtils.getUserNameFromJwtToken(token);
         log.info("Fetching documents for username: {}", username);
 
-        return transcriptionRepository.findByUsernameOrderByCreateTimeDesc(username)
+        return aranegarRepository.findByUsernameOrderByCreateTimeDesc(username)
                 .map(document -> HistoryDto.builder()
                         .id(document.getSessionId())
                         .title(document.getTitle())
@@ -69,7 +69,7 @@ public class HistoryController {
 
         String caller = jwtUtils.getUserNameFromJwtToken(token);
 
-        return transcriptionRepository.findById(documentId)
+        return aranegarRepository.findById(documentId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found")))
                 .flatMap(document -> {
                     if (!caller.equals(document.getUsername())) {
@@ -131,7 +131,7 @@ public class HistoryController {
         String username = jwtUtils.getUserNameFromJwtToken(token);
         log.info("Received request to delete history. sessionId: {}, username: {}", sessionId, username);
 
-        return transcriptionRepository.findById(sessionId)
+        return aranegarRepository.findById(sessionId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found")))
                 .flatMap(document -> {
                     if (!document.getUsername().equals(username)) {
@@ -140,7 +140,7 @@ public class HistoryController {
                                 "You are not the owner of this document"));
                     }
 
-                    return transcriptionRepository.deleteById(sessionId)
+                    return aranegarRepository.deleteById(sessionId)
                             .then(elasticsearchOperations.indexOps(AranegarDocument.class).refresh())
                             .then(minioService.deleteFile(document.getReferenceImagePath()))
                             .then(minioService.deleteFile(document.getEditableImagePath()))
@@ -168,7 +168,7 @@ public class HistoryController {
         String username = jwtUtils.getUserNameFromJwtToken(token);
         log.info("Received request to delete all history for username: {}", username);
 
-        return transcriptionRepository.findByUsername(username)
+        return aranegarRepository.findByUsername(username)
                 .collectList()
                 .flatMap(documents -> {
                     if (documents.isEmpty()) {
@@ -182,7 +182,7 @@ public class HistoryController {
                                     minioService.deleteFile(document.getResultImagePath())
                                             .then(minioService.deleteFile(document.getReferenceImagePath()))
                                             .then(minioService.deleteFile(document.getEditableImagePath()))
-                                            .then(transcriptionRepository.deleteById(document.getSessionId()))
+                                            .then(aranegarRepository.deleteById(document.getSessionId()))
                                             .then(elasticsearchOperations.indexOps(AranegarDocument.class).refresh())
                             )
                             .then(Mono.just(true));
@@ -220,7 +220,7 @@ public class HistoryController {
                             "File name contains invalid control characters.")));
         }
 
-        return transcriptionRepository.findById(sessionId)
+        return aranegarRepository.findById(sessionId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found")))
                 .flatMap(document -> {
                     if (!document.getUsername().equals(username)) {
@@ -231,7 +231,7 @@ public class HistoryController {
 
                     document.setTitle(request.getNewTitle());
 
-                    return transcriptionRepository.save(document)
+                    return aranegarRepository.save(document)
                             .then(elasticsearchOperations.indexOps(AranegarDocument.class).refresh())
                             .thenReturn(ResponseEntity.ok(GenericResponseDto.success(true)));
                 })

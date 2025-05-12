@@ -44,7 +44,7 @@ public class ElasticsearchService {
                 .createTime(System.currentTimeMillis())
                 .build();
 
-        log.info("Saving document to Elasticsearch (with 20-doc limit) for user={}", username);
+        log.info("Saving document to Elasticsearch for user={}", username);
 
         Mono<Void> evictionMono = aranegarRepository.countByUsername(username)
                 .flatMap(count -> {
