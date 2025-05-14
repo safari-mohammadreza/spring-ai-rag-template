@@ -26,7 +26,7 @@ public class ElasticsearchService {
             String editableImageName, String editableImagePath,
             String referenceImageName, String referenceImagePath,
             String editedImageName, String editedImagePath,
-            String maskImageName, String maskImagePath) {
+            String maskImageName, String maskImagePath, String resultFilename) {
 
         AranegarDocument document = AranegarDocument.builder()
                 .sessionId(sessionId)
@@ -34,6 +34,7 @@ public class ElasticsearchService {
                 .referenceImageName(referenceImageName)
                 .editableImageName(editableImageName)
                 .editedImageName(editedImageName)
+                .resultImageName(resultFilename)
                 .maskImageName(maskImageName)
                 .referenceImagePath(referenceImagePath)
                 .editableImagePath(editableImagePath)

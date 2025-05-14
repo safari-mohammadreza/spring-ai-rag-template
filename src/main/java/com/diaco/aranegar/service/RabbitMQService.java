@@ -22,12 +22,13 @@ public class RabbitMQService {
     private String queueName;
 
     public Mono<Boolean> sendToQueue(String referenceImageUrl, String editableImageUrl, String maskImageUrl,
-                                     String sessionId) {
+                                     String sessionId, String resultFilePath) {
         Map<String, String> message = new HashMap<>();
         message.put("reference_file_url", referenceImageUrl);
         message.put("editable_file_url", editableImageUrl);
         message.put("mask_file_url", maskImageUrl);
         message.put("session_id", sessionId);
+        message.put("result_file_path", resultFilePath);
 
         // Wrap the RabbitMQ sending in a Mono so we can stay in the reactive world.
         return Mono.fromCallable(() -> {

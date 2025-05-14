@@ -227,8 +227,11 @@ public class AranegarController {
                     String maskImageUrl = urls.getT3();
                     String editedImageUrl = urls.getT4();
 
+                    String resultFileName = "result.jpg";
+                    String resultFilePath = minioService.generateMinIoFilePath(username, sessionId, resultFileName);
+
                     // 3. Send both URLs to RabbitMQ
-                    return rabbitMQService.sendToQueue(referenceImageUrl, editableImageUrl, maskImageUrl, sessionId)
+                    return rabbitMQService.sendToQueue(referenceImageUrl, editableImageUrl, maskImageUrl, sessionId, resultFilePath)
                             .flatMap(sent -> {
                                 if (sent) {
                                     log.info("Successfully sent URLs to RabbitMQ for sessionId={}", sessionId);
@@ -236,7 +239,7 @@ public class AranegarController {
                                     return elasticsearchService
                                             .saveInitialDocument(username, sessionId, editableImageName,
                                                     editableImagePath, referenceImageName, referenceImagePath,
-                                                    editedImageName, editedImagePath, maskImageName, maskImagePath)
+                                                    editedImageName, editedImagePath, maskImageName, maskImagePath, resultFileName)
                                             .thenReturn(ResponseEntity.ok(GenericResponseDto.success(sessionId)));
                                 } else {
                                     log.error("Failed to send URLs to RabbitMQ for sessionId={}", sessionId);
