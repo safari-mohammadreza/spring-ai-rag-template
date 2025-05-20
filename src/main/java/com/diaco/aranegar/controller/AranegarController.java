@@ -295,12 +295,6 @@ public class AranegarController {
         );
         sink.emitError(new ErrorMessageException(request.getSessionId(), request.getErrorMessage()),
                 Sinks.EmitFailureHandler.FAIL_FAST);
-
-        // 2) throw so RabbitMQ will reject-without-requeue
-        throw new ErrorMessageException(
-                request.getSessionId(),
-                request.getErrorMessage()
-        );
     }
 
     public void receiveProgress(FromAIProgressDto request) {
