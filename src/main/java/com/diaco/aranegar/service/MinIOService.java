@@ -101,7 +101,7 @@ public class MinIOService {
             );
             return Mono.just(presignedUrl);
         } catch (Exception e) {
-            log.error("Error generating pre-signed URL for file: {}", filePath, e);
+            log.error("Error generating pre-signed URL for file: {}, {}", filePath, e.getMessage());
             return Mono.error(e);
         }
     }
