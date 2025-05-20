@@ -1,5 +1,6 @@
 package com.diaco.aranegar.base.controller;
 
+import com.diaco.aranegar.base.exception.ErrorMessageException;
 import com.diaco.aranegar.base.exception.FileNotFoundException;
 import com.diaco.aranegar.model.dto.GenericResponseDto;
 import com.diaco.aranegar.model.enums.ResultEnum;
@@ -12,6 +13,17 @@ import org.springframework.web.reactive.result.method.annotation.ResponseEntityE
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
+    @ExceptionHandler(ErrorMessageException.class)
+    public ResponseEntity<GenericResponseDto<?>> handleMessageParsing(ErrorMessageException exception) {
+        String msg = exception.getMessage() != null
+                ? exception.getMessage()
+                : "AI model service has error!";
+        GenericResponseDto<?> body = GenericResponseDto.failure(
+                ResultEnum.GENERAL_NOT_FOUND,
+                msg
+        );
+        return new ResponseEntity<>(body, HttpStatus.NOT_FOUND);
+    }
     @ExceptionHandler(FileNotFoundException.class)
     public ResponseEntity<GenericResponseDto<String>> handleFileNotFoundException
             (FileNotFoundException exception) {

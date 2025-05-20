@@ -1,10 +1,8 @@
 package com.diaco.aranegar.controller;
 
+import com.diaco.aranegar.base.exception.ErrorMessageException;
 import com.diaco.aranegar.base.exception.FileNotFoundException;
-import com.diaco.aranegar.model.dto.FromAIProgressDto;
-import com.diaco.aranegar.model.dto.FromAIResultDto;
-import com.diaco.aranegar.model.dto.GeneralMessageDto;
-import com.diaco.aranegar.model.dto.GenericResponseDto;
+import com.diaco.aranegar.model.dto.*;
 import com.diaco.aranegar.model.enums.ResultEnum;
 import com.diaco.aranegar.service.ElasticsearchService;
 import com.diaco.aranegar.service.MinIOService;
@@ -268,7 +266,7 @@ public class AranegarController {
             request = objectMapper.readValue(message, GeneralMessageDto.class);
         } catch (Exception e) {
             log.error("read value of received message: {} from rabbitmq failed!", message);
-            throw new RuntimeException(e); // TODO: 4/8/25 proper exception
+            return;
         }
         switch (request.getDataType()) {
             case PROGRESS -> {
@@ -280,10 +278,29 @@ public class AranegarController {
                 receiveResult(fromAIResultDto);
             }
             case ERROR -> {
-                log.error("Error message received: {}", request);
+                FromAIErrorDto fromAIErrorDto = objectMapper.convertValue(request.getData(), FromAIErrorDto.class);
+                receiveError(fromAIErrorDto);
             }
             default -> log.error("Invalid data type: {} in message: {}", request.getDataType(), message);
         }
+    }
+
+    public void receiveError(FromAIErrorDto request) {
+        log.info("Received error for sessionId: {}", request.getSessionId());
+
+        // 1) emit into Reactor sink
+        Sinks.Many<String> sink = sinkMap.computeIfAbsent(
+                request.getSessionId(),
+                id -> Sinks.many().multicast().onBackpressureBuffer()
+        );
+        sink.emitError(new ErrorMessageException(request.getSessionId(), request.getErrorMessage()),
+                Sinks.EmitFailureHandler.FAIL_FAST);
+
+        // 2) throw so RabbitMQ will reject-without-requeue
+        throw new ErrorMessageException(
+                request.getSessionId(),
+                request.getErrorMessage()
+        );
     }
 
     public void receiveProgress(FromAIProgressDto request) {
