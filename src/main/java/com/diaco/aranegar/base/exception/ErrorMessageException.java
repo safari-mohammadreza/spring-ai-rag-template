@@ -5,12 +5,11 @@ import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 
 @Getter
 public class ErrorMessageException extends AmqpRejectAndDontRequeueException {
-    private final String sessionId;
+
     private final String errorMessage;
 
-    public ErrorMessageException(String sessionId, String errorMessage) {
-        super("AI error for session " + sessionId + ": " + errorMessage);
-        this.sessionId = sessionId;
+    public ErrorMessageException(String errorMessage) {
+        super(errorMessage);
         this.errorMessage = errorMessage;
     }
 

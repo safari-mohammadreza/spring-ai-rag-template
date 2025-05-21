@@ -286,14 +286,14 @@ public class AranegarController {
     }
 
     public void receiveError(FromAIErrorDto request) {
-        log.info("Received error for sessionId: {}", request.getSessionId());
+        log.info("Received error: {} for sessionId: {}", request.getSessionId(), request.getErrorMessage());
 
         // 1) emit into Reactor sink
         Sinks.Many<String> sink = sinkMap.computeIfAbsent(
                 request.getSessionId(),
                 id -> Sinks.many().multicast().onBackpressureBuffer()
         );
-        sink.emitError(new ErrorMessageException(request.getSessionId(), request.getErrorMessage()),
+        sink.emitError(new ErrorMessageException(request.getErrorMessage()),
                 Sinks.EmitFailureHandler.FAIL_FAST);
     }
 

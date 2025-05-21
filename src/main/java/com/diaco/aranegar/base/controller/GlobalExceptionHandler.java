@@ -24,6 +24,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         );
         return new ResponseEntity<>(body, HttpStatus.NOT_FOUND);
     }
+
     @ExceptionHandler(FileNotFoundException.class)
     public ResponseEntity<GenericResponseDto<String>> handleFileNotFoundException
             (FileNotFoundException exception) {
