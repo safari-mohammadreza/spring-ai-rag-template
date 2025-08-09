@@ -1,6 +1,6 @@
 # Spring AI RAG Template (Gradle)
 
-A compact template that demonstrates how to build a Retrieval-Augmented-Generation (RAG) microservice using Spring AI and Java 21 — now built with Gradle (Kotlin DSL).
+A compact template that demonstrates how to build a Retrieval-Augmented-Generation (RAG) microservice using Spring AI and Java 21.
 
 ## Features
 - Uses Spring AI (1.0.1) with OpenAI model starter for embeddings + chat.
