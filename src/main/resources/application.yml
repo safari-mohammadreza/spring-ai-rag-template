@@ -1,0 +1,9 @@
+server:
+  port: 8080
+
+spring:
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+    model:
+      chat: openai
